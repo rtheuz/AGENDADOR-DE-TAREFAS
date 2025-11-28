@@ -2,9 +2,36 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="description" content="Agendador de Tarefas Web - Organize suas tarefas de forma eficiente">
     <title>Task Scheduler - Agendador de Tarefas</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TaskScheduler">
+    <meta name="application-name" content="Task Scheduler">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-TileColor" content="#6366f1">
+    <meta name="msapplication-tap-highlight" content="no">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-72x72.png">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-192x192.png">
+    
+    <!-- Splash Screens for iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,14 +53,56 @@
                     <span class="icon">🔔</span>
                     <span class="badge-count" id="badgeCount">0</span>
                 </div>
+                <button id="menuBtn" class="btn btn-icon mobile-only" aria-label="Menu" title="Menu">
+                    <span class="icon">☰</span>
+                </button>
             </div>
         </div>
     </header>
 
+    <!-- Mobile Stats Bar -->
+    <div class="mobile-stats-bar" id="mobileStatsBar">
+        <div class="stats-mini">
+            <div class="stat-mini-item" id="todayCountBadge">
+                <span class="stat-mini-value" id="todayTasksCount">0</span>
+                <span class="stat-mini-label">Hoje</span>
+            </div>
+            <div class="stat-mini-item pending">
+                <span class="stat-mini-value" id="pendingTasksCount">0</span>
+                <span class="stat-mini-label">Pendentes</span>
+            </div>
+            <div class="stat-mini-item completed">
+                <span class="stat-mini-value" id="completedTasksCount">0</span>
+                <span class="stat-mini-label">Concluídas</span>
+            </div>
+            <div class="stat-mini-item overdue">
+                <span class="stat-mini-value" id="overdueTasksCount">0</span>
+                <span class="stat-mini-label">Atrasadas</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation" role="tablist" aria-label="Filtros de tarefas">
+        <button class="tab-btn active" data-tab="today" role="tab" aria-selected="true" id="tabToday">
+            <span class="tab-icon">📅</span>
+            <span class="tab-label">Hoje</span>
+            <span class="tab-badge" id="todayBadge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="week" role="tab" aria-selected="false" id="tabWeek">
+            <span class="tab-icon">📆</span>
+            <span class="tab-label">Semana</span>
+        </button>
+        <button class="tab-btn" data-tab="all" role="tab" aria-selected="false" id="tabAll">
+            <span class="tab-icon">📋</span>
+            <span class="tab-label">Todas</span>
+        </button>
+    </nav>
+
     <!-- Main Container -->
     <main class="main-container">
-        <!-- Sidebar with Statistics -->
-        <aside class="sidebar" id="sidebar">
+        <!-- Sidebar with Statistics (Desktop Only) -->
+        <aside class="sidebar desktop-only" id="sidebar">
             <div class="stats-card">
                 <h2>📊 Dashboard</h2>
                 <div class="stats-grid">
@@ -79,8 +148,8 @@
 
         <!-- Content Area -->
         <div class="content">
-            <!-- Toolbar -->
-            <div class="toolbar">
+            <!-- Toolbar (Desktop) -->
+            <div class="toolbar desktop-only">
                 <div class="search-container">
                     <span class="search-icon">🔍</span>
                     <input type="search" id="searchInput" placeholder="Buscar tarefas..." aria-label="Buscar tarefas">
@@ -140,16 +209,30 @@
                 </div>
             </div>
 
+            <!-- Mobile Search Bar -->
+            <div class="mobile-search-bar mobile-only">
+                <div class="search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="search" id="mobileSearchInput" placeholder="Buscar tarefas..." aria-label="Buscar tarefas">
+                </div>
+            </div>
+
+            <!-- Pull to Refresh Indicator -->
+            <div class="pull-to-refresh" id="pullToRefresh">
+                <div class="pull-spinner"></div>
+                <span>Atualizando...</span>
+            </div>
+
             <!-- Tasks Container -->
             <div id="tasksContainer" class="tasks-container list-view">
+                <!-- Task Groups will be rendered here -->
+                
                 <!-- Empty State -->
                 <div class="empty-state" id="emptyState">
                     <span class="empty-icon">📝</span>
                     <h3>Nenhuma tarefa encontrada</h3>
                     <p>Clique no botão + para adicionar sua primeira tarefa</p>
                 </div>
-                
-                <!-- Tasks will be rendered here -->
             </div>
         </div>
     </main>
@@ -167,42 +250,110 @@
                 <button class="modal-close" id="closeModal" aria-label="Fechar modal">×</button>
             </div>
             <form id="taskForm" class="modal-body">
-                <div class="form-group">
-                    <label for="taskTitle">Título *</label>
-                    <input type="text" id="taskTitle" required placeholder="Digite o título da tarefa" maxlength="100">
-                    <span class="error-message" id="titleError"></span>
-                </div>
-                
-                <div class="form-group">
-                    <label for="taskDescription">Descrição</label>
-                    <textarea id="taskDescription" placeholder="Descreva os detalhes da tarefa" rows="3" maxlength="500"></textarea>
-                </div>
-                
-                <div class="form-row">
+                <!-- Quick Add Mode -->
+                <div class="quick-add-section" id="quickAddSection">
                     <div class="form-group">
-                        <label for="taskDate">Data de Vencimento</label>
-                        <input type="date" id="taskDate" required>
+                        <label for="taskTitle">Título *</label>
+                        <input type="text" id="taskTitle" required placeholder="O que você precisa fazer?" maxlength="100" autocomplete="off">
+                        <span class="error-message" id="titleError"></span>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="taskTime">Horário</label>
-                        <input type="time" id="taskTime">
+                    <div class="quick-date-buttons">
+                        <button type="button" class="quick-date-btn active" data-date="today">Hoje</button>
+                        <button type="button" class="quick-date-btn" data-date="tomorrow">Amanhã</button>
+                        <button type="button" class="quick-date-btn" data-date="nextweek">Próx. Semana</button>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="taskDate">Data</label>
+                            <input type="date" id="taskDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="taskTime">Horário</label>
+                            <input type="time" id="taskTime">
+                        </div>
                     </div>
                 </div>
                 
-                <div class="form-row">
+                <!-- Advanced Options Toggle -->
+                <button type="button" class="toggle-advanced-btn" id="toggleAdvancedBtn">
+                    <span class="toggle-icon">⚙️</span>
+                    <span class="toggle-text">Mais opções</span>
+                    <span class="toggle-arrow">▼</span>
+                </button>
+                
+                <!-- Advanced Options -->
+                <div class="advanced-options hidden" id="advancedOptions">
                     <div class="form-group">
-                        <label for="taskPriority">Prioridade</label>
-                        <select id="taskPriority" required>
-                            <option value="medium">🟡 Média</option>
-                            <option value="high">🔴 Alta</option>
-                            <option value="low">🟢 Baixa</option>
-                        </select>
+                        <label for="taskDescription">Descrição</label>
+                        <textarea id="taskDescription" placeholder="Detalhes adicionais..." rows="2" maxlength="500"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="taskPriority">Prioridade</label>
+                            <div class="priority-selector" role="radiogroup" aria-label="Selecionar prioridade">
+                                <label class="priority-option low">
+                                    <input type="radio" name="priority" value="low">
+                                    <span class="priority-icon">🟢</span>
+                                    <span class="priority-label">Baixa</span>
+                                </label>
+                                <label class="priority-option medium">
+                                    <input type="radio" name="priority" value="medium" checked>
+                                    <span class="priority-icon">🟡</span>
+                                    <span class="priority-label">Média</span>
+                                </label>
+                                <label class="priority-option high">
+                                    <input type="radio" name="priority" value="high">
+                                    <span class="priority-icon">🔴</span>
+                                    <span class="priority-label">Alta</span>
+                                </label>
+                            </div>
+                            <select id="taskPriority" class="hidden" required>
+                                <option value="medium">🟡 Média</option>
+                                <option value="high">🔴 Alta</option>
+                                <option value="low">🟢 Baixa</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <div class="form-group">
                         <label for="taskCategory">Categoria</label>
-                        <select id="taskCategory" required>
+                        <div class="category-selector" role="radiogroup" aria-label="Selecionar categoria">
+                            <label class="category-option work">
+                                <input type="radio" name="category" value="work" checked>
+                                <span class="category-icon">💼</span>
+                                <span class="category-label">Trabalho</span>
+                            </label>
+                            <label class="category-option personal">
+                                <input type="radio" name="category" value="personal">
+                                <span class="category-icon">👤</span>
+                                <span class="category-label">Pessoal</span>
+                            </label>
+                            <label class="category-option study">
+                                <input type="radio" name="category" value="study">
+                                <span class="category-icon">📚</span>
+                                <span class="category-label">Estudos</span>
+                            </label>
+                            <label class="category-option health">
+                                <input type="radio" name="category" value="health">
+                                <span class="category-icon">❤️</span>
+                                <span class="category-label">Saúde</span>
+                            </label>
+                            <label class="category-option shopping">
+                                <input type="radio" name="category" value="shopping">
+                                <span class="category-icon">🛒</span>
+                                <span class="category-label">Compras</span>
+                            </label>
+                            <label class="category-option other">
+                                <input type="radio" name="category" value="other">
+                                <span class="category-icon">📌</span>
+                                <span class="category-label">Outros</span>
+                            </label>
+                        </div>
+                        <select id="taskCategory" class="hidden" required>
                             <option value="work">🔵 Trabalho</option>
                             <option value="personal">🟣 Pessoal</option>
                             <option value="study">🟢 Estudos</option>
@@ -217,7 +368,10 @@
                 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="cancelBtn">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" id="saveTaskBtn">Salvar Tarefa</button>
+                    <button type="submit" class="btn btn-primary" id="saveTaskBtn">
+                        <span class="btn-icon">✓</span>
+                        Salvar
+                    </button>
                 </div>
             </form>
         </div>
@@ -244,9 +398,63 @@
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+    <!-- Menu Overlay (Mobile) -->
+    <div class="menu-overlay" id="menuOverlay">
+        <div class="menu-panel">
+            <div class="menu-header">
+                <h3>Configurações</h3>
+                <button class="menu-close" id="menuClose">×</button>
+            </div>
+            <div class="menu-content">
+                <div class="menu-section">
+                    <h4>Filtros</h4>
+                    <div class="menu-filters">
+                        <select id="mobileStatusFilter" aria-label="Filtrar por status">
+                            <option value="all">Todas</option>
+                            <option value="active">Ativas</option>
+                            <option value="completed">Concluídas</option>
+                        </select>
+                        <select id="mobilePriorityFilter" aria-label="Filtrar por prioridade">
+                            <option value="all">Todas Prioridades</option>
+                            <option value="high">Alta</option>
+                            <option value="medium">Média</option>
+                            <option value="low">Baixa</option>
+                        </select>
+                        <select id="mobileCategoryFilter" aria-label="Filtrar por categoria">
+                            <option value="all">Todas Categorias</option>
+                            <option value="work">💼 Trabalho</option>
+                            <option value="personal">👤 Pessoal</option>
+                            <option value="study">📚 Estudos</option>
+                            <option value="health">❤️ Saúde</option>
+                            <option value="shopping">🛒 Compras</option>
+                            <option value="other">📌 Outros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="menu-section">
+                    <h4>Dados</h4>
+                    <button id="mobileExportBtn" class="btn btn-secondary btn-full">
+                        <span class="icon">📤</span> Exportar Tarefas
+                    </button>
+                    <button id="mobileImportBtn" class="btn btn-secondary btn-full">
+                        <span class="icon">📥</span> Importar Tarefas
+                    </button>
+                </div>
+                <div class="menu-section">
+                    <h4>Notificações</h4>
+                    <button id="enableNotificationsBtn" class="btn btn-secondary btn-full">
+                        <span class="icon">🔔</span> Ativar Notificações
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="js/storage.js"></script>
     <script src="js/notifications.js"></script>
+    <script src="js/push-notifications.js"></script>
+    <script src="js/pwa-install.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
