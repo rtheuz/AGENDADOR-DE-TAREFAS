@@ -1,16 +1,21 @@
 {
   "name": "Agendador de Tarefas Bruna - Gerenciador Profissional de Tarefas",
-  "short_name": "Agendador de Tarefas Bruna",
+  "short_name": "Agendador",
   "description": "Sistema profissional de gerenciamento de tarefas e eventos com interface moderna e intuitiva",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "theme_color": "#6366f1",
   "background_color": "#ffffff",
   "lang": "pt-BR",
   "dir": "ltr",
   "categories": ["productivity", "business", "utilities"],
+  "id": "/",
+  "display_override": ["standalone", "minimal-ui"],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -66,7 +71,7 @@
       "name": "Nova Tarefa",
       "short_name": "Nova",
       "description": "Criar uma nova tarefa rapidamente",
-      "url": "/? action=new",
+      "url": "/?action=new",
       "icons": [
         {
           "src": "/icons/icon-96x96.png",
@@ -85,8 +90,32 @@
           "sizes": "96x96"
         }
       ]
+    },
+    {
+      "name": "Esta Semana",
+      "short_name": "Semana",
+      "description": "Ver tarefas da semana",
+      "url": "/?view=week",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text"
+    }
+  },
   "related_applications": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  }
 }
