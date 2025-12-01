@@ -2,7 +2,7 @@
   "name": "Agendador de Tarefas Bruna - Gerenciador Profissional de Tarefas",
   "short_name": "Agendador",
   "description": "Sistema profissional de gerenciamento de tarefas e eventos com interface moderna e intuitiva",
-  "start_url": "/.index.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -71,7 +71,7 @@
       "name": "Nova Tarefa",
       "short_name": "Nova",
       "description": "Criar uma nova tarefa rapidamente",
-      "url": "./?action=new",
+      "url": ". /? action=new",
       "icons": [
         {
           "src": "./icons/icon-96x96.png",
@@ -83,7 +83,7 @@
       "name": "Tarefas de Hoje",
       "short_name": "Hoje",
       "description": "Ver tarefas de hoje",
-      "url": "./?view=today",
+      "url": ". /?view=today",
       "icons": [
         {
           "src": "./icons/icon-96x96.png",
@@ -98,7 +98,7 @@
       "url": "./?view=week",
       "icons": [
         {
-          "src": "./icons/icon-96x96.png",
+          "src": "./icons/icon-96x96. png",
           "sizes": "96x96"
         }
       ]
