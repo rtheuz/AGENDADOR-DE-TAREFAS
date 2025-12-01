@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="description" content="Sistema profissional de gerenciamento de tarefas e eventos com design moderno">
     <title>Agendador de Tarefas Bruna</title>
     
@@ -12,6 +12,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Agendador de Tarefas Bruna">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    
+    <!-- iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" href="icons/icon-512x512.png">
     
     <!-- Icons & Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -22,9 +27,21 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- ==================== MOBILE SIDEBAR OVERLAY ==================== -->
+    <div class="mobile-sidebar-overlay" id="mobileSidebarOverlay"></div>
+
     <!-- ==================== APP HEADER ==================== -->
     <header class="app-header">
         <div class="header-container">
+            <!-- Mobile Menu Button -->
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
+                <span class="hamburger-icon">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+
             <!-- Brand -->
             <a href="#" class="brand">
                 <div class="brand-icon">✓</div>
@@ -39,6 +56,11 @@
                 <span class="header-search-icon">🔍</span>
                 <input type="search" id="headerSearch" placeholder="Buscar tarefas, eventos..." autocomplete="off">
             </div>
+
+            <!-- Mobile Search Button -->
+            <button class="mobile-search-btn" id="mobileSearchBtn" aria-label="Buscar">
+                <span>🔍</span>
+            </button>
 
             <!-- Header Actions -->
             <div class="header-actions">
@@ -58,6 +80,22 @@
             </div>
         </div>
     </header>
+
+    <!-- ==================== MOBILE FULLSCREEN SEARCH ==================== -->
+    <div class="mobile-search-overlay" id="mobileSearchOverlay">
+        <div class="mobile-search-header">
+            <button class="mobile-search-back" id="mobileSearchBack" aria-label="Voltar">
+                <span>←</span>
+            </button>
+            <div class="mobile-search-input-wrapper">
+                <span class="mobile-search-icon">🔍</span>
+                <input type="search" id="mobileSearchInput" placeholder="Buscar tarefas..." autocomplete="off">
+            </div>
+        </div>
+        <div class="mobile-search-results" id="mobileSearchResults">
+            <p class="mobile-search-hint">Digite para buscar tarefas...</p>
+        </div>
+    </div>
 
     <!-- ==================== MAIN LAYOUT ==================== -->
     <div class="app-layout">
@@ -282,6 +320,36 @@
         </aside>
     </div>
 
+    <!-- ==================== BOTTOM NAVIGATION (Mobile Tab Bar) ==================== -->
+    <nav class="bottom-nav" id="bottomNav">
+        <a href="#" class="bottom-nav-item active" data-view="today" id="bottomNavToday">
+            <span class="bottom-nav-icon">🏠</span>
+            <span class="bottom-nav-label">Hoje</span>
+            <span class="bottom-nav-badge" id="bottomNavTodayBadge"></span>
+        </a>
+        <a href="#" class="bottom-nav-item" data-view="week" id="bottomNavWeek">
+            <span class="bottom-nav-icon">📅</span>
+            <span class="bottom-nav-label">Semana</span>
+        </a>
+        <button class="bottom-nav-fab" id="bottomNavAdd" aria-label="Adicionar tarefa">
+            <span class="bottom-nav-fab-icon">➕</span>
+        </button>
+        <a href="#" class="bottom-nav-item" data-view="completed" id="bottomNavCompleted">
+            <span class="bottom-nav-icon">✅</span>
+            <span class="bottom-nav-label">Concluídas</span>
+        </a>
+        <button class="bottom-nav-item" id="bottomNavMenu">
+            <span class="bottom-nav-icon">⚙️</span>
+            <span class="bottom-nav-label">Menu</span>
+        </button>
+    </nav>
+
+    <!-- ==================== PULL TO REFRESH INDICATOR ==================== -->
+    <div class="pull-to-refresh" id="pullToRefresh">
+        <div class="pull-to-refresh-spinner"></div>
+        <span class="pull-to-refresh-text">Atualizando...</span>
+    </div>
+
     <!-- ==================== FAB ==================== -->
     <button class="fab" id="fabBtn" title="Criar nova tarefa">
         <span>+</span>
@@ -289,9 +357,10 @@
 
     <!-- ==================== MODALS ==================== -->
     
-    <!-- Task Modal -->
+    <!-- Task Modal (Bottom Sheet on Mobile) -->
     <div class="modal-overlay" id="taskModal">
-        <div class="modal">
+        <div class="modal bottom-sheet">
+            <div class="bottom-sheet-handle"></div>
             <div class="modal-header">
                 <h2 class="modal-title" id="taskModalTitle">Nova Tarefa</h2>
                 <button class="modal-close" id="closeTaskModal">×</button>
@@ -434,9 +503,10 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Delete Confirmation Modal (Action Sheet on Mobile) -->
     <div class="modal-overlay" id="deleteModal">
-        <div class="modal">
+        <div class="modal action-sheet">
+            <div class="bottom-sheet-handle"></div>
             <div class="modal-header">
                 <h2 class="modal-title">Confirmar Exclusão</h2>
                 <button class="modal-close" id="closeDeleteModal">×</button>

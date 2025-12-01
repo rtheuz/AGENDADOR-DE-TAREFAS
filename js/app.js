@@ -1,6 +1,6 @@
 /**
  * TaskScheduler Pro - Professional Task Management System
- * Enterprise-grade task and event management
+ * Enterprise-grade task and event management with Mobile-First Design
  */
 
 class TaskSchedulerPro {
@@ -11,6 +11,13 @@ class TaskSchedulerPro {
         this.currentSort = 'priority';
         this.editingTaskId = null;
         this.calendarDate = new Date();
+        
+        // Mobile specific properties
+        this.isMobile = window.matchMedia('(max-width: 768px)').matches;
+        this.touchStartY = 0;
+        this.touchStartX = 0;
+        this.isPulling = false;
+        this.swipingTaskId = null;
 
         this.init();
     }
@@ -19,12 +26,14 @@ class TaskSchedulerPro {
     init() {
         this.loadTasks();
         this.setupEventListeners();
+        this.setupMobileEventListeners();
         this.setupTheme();
         this.renderCalendar();
         this.renderTasks();
         this.updateAllStats();
         this.setDefaultDate();
         this.startAutoRefresh();
+        this.detectMobileDevice();
 
         // Initialize notifications
         if (window.NotificationManager) {
@@ -32,6 +41,372 @@ class TaskSchedulerPro {
         }
 
         console.log('✓ TaskScheduler Pro initialized');
+        console.log('✓ Mobile mode:', this.isMobile);
+    }
+
+    // ==================== MOBILE DEVICE DETECTION ====================
+    detectMobileDevice() {
+        const mediaQuery = window.matchMedia('(max-width: 768px)');
+        
+        const handleChange = (e) => {
+            this.isMobile = e.matches;
+            document.body.classList.toggle('is-mobile', this.isMobile);
+        };
+        
+        handleChange(mediaQuery);
+        mediaQuery.addEventListener('change', handleChange);
+    }
+
+    // ==================== MOBILE EVENT LISTENERS ====================
+    setupMobileEventListeners() {
+        // Mobile Menu Button (Hamburger)
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('mobileSidebarOverlay');
+
+        if (mobileMenuBtn && sidebar && overlay) {
+            mobileMenuBtn.addEventListener('click', () => {
+                this.toggleMobileSidebar();
+            });
+
+            overlay.addEventListener('click', () => {
+                this.closeMobileSidebar();
+            });
+        }
+
+        // Mobile Search
+        const mobileSearchBtn = document.getElementById('mobileSearchBtn');
+        const mobileSearchOverlay = document.getElementById('mobileSearchOverlay');
+        const mobileSearchBack = document.getElementById('mobileSearchBack');
+        const mobileSearchInput = document.getElementById('mobileSearchInput');
+
+        if (mobileSearchBtn && mobileSearchOverlay) {
+            mobileSearchBtn.addEventListener('click', () => {
+                this.openMobileSearch();
+            });
+
+            mobileSearchBack?.addEventListener('click', () => {
+                this.closeMobileSearch();
+            });
+
+            mobileSearchInput?.addEventListener('input', (e) => {
+                this.handleMobileSearch(e.target.value);
+            });
+        }
+
+        // Bottom Navigation
+        document.querySelectorAll('.bottom-nav-item[data-view]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchView(item.dataset.view);
+                this.updateBottomNavActive(item.dataset.view);
+            });
+        });
+
+        document.getElementById('bottomNavAdd')?.addEventListener('click', () => {
+            this.openTaskModal();
+            this.triggerHapticFeedback();
+        });
+
+        document.getElementById('bottomNavMenu')?.addEventListener('click', () => {
+            this.toggleMobileSidebar();
+        });
+
+        // Pull to Refresh
+        this.setupPullToRefresh();
+
+        // Swipe Gestures for Tasks
+        this.setupSwipeGestures();
+
+        // Bottom Sheet Drag
+        this.setupBottomSheetDrag();
+
+        // Handle viewport resize
+        window.addEventListener('resize', () => {
+            this.isMobile = window.matchMedia('(max-width: 768px)').matches;
+        });
+    }
+
+    // ==================== MOBILE SIDEBAR ====================
+    toggleMobileSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('mobileSidebarOverlay');
+        const menuBtn = document.getElementById('mobileMenuBtn');
+
+        sidebar?.classList.toggle('open');
+        overlay?.classList.toggle('active');
+        menuBtn?.classList.toggle('active');
+        
+        // Prevent body scroll when sidebar is open
+        document.body.style.overflow = sidebar?.classList.contains('open') ? 'hidden' : '';
+        
+        this.triggerHapticFeedback();
+    }
+
+    closeMobileSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('mobileSidebarOverlay');
+        const menuBtn = document.getElementById('mobileMenuBtn');
+
+        sidebar?.classList.remove('open');
+        overlay?.classList.remove('active');
+        menuBtn?.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // ==================== MOBILE SEARCH ====================
+    openMobileSearch() {
+        const overlay = document.getElementById('mobileSearchOverlay');
+        const input = document.getElementById('mobileSearchInput');
+        
+        overlay?.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        setTimeout(() => {
+            input?.focus();
+        }, 100);
+    }
+
+    closeMobileSearch() {
+        const overlay = document.getElementById('mobileSearchOverlay');
+        const input = document.getElementById('mobileSearchInput');
+        
+        overlay?.classList.remove('active');
+        document.body.style.overflow = '';
+        
+        if (input) input.value = '';
+        this.renderTasks();
+    }
+
+    handleMobileSearch(query) {
+        const resultsContainer = document.getElementById('mobileSearchResults');
+        if (!resultsContainer) return;
+
+        if (!query.trim()) {
+            resultsContainer.innerHTML = '<p class="mobile-search-hint">Digite para buscar tarefas...</p>';
+            return;
+        }
+
+        const searchLower = query.toLowerCase();
+        const results = this.tasks.filter(task =>
+            task.title.toLowerCase().includes(searchLower) ||
+            task.description?.toLowerCase().includes(searchLower)
+        );
+
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<p class="mobile-search-hint">Nenhuma tarefa encontrada</p>';
+            return;
+        }
+
+        // Clear container and add results with proper event listeners
+        resultsContainer.innerHTML = '';
+        results.forEach(task => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'mobile-search-result';
+            resultDiv.innerHTML = `
+                <div class="mobile-search-result-title">${this.escapeHtml(task.title)}</div>
+                <div class="mobile-search-result-meta">${this.escapeHtml(this.formatDate(task.date))}</div>
+            `;
+            resultDiv.addEventListener('click', () => {
+                this.openTaskModal(task.id);
+                this.closeMobileSearch();
+            });
+            resultsContainer.appendChild(resultDiv);
+        });
+    }
+
+    // ==================== BOTTOM NAVIGATION ====================
+    updateBottomNavActive(view) {
+        document.querySelectorAll('.bottom-nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        const activeItem = document.querySelector(`.bottom-nav-item[data-view="${view}"]`);
+        activeItem?.classList.add('active');
+    }
+
+    updateBottomNavBadges() {
+        const todayCount = this.tasks.filter(task => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const taskDate = this.parseLocalDate(task.date);
+            taskDate.setHours(0, 0, 0, 0);
+            return taskDate.getTime() === today.getTime() && !task.completed;
+        }).length;
+
+        const badge = document.getElementById('bottomNavTodayBadge');
+        if (badge) {
+            badge.textContent = todayCount > 0 ? todayCount : '';
+        }
+    }
+
+    // ==================== PULL TO REFRESH ====================
+    setupPullToRefresh() {
+        if (!this.isMobile) return;
+
+        const mainContent = document.querySelector('.main-content');
+        const pullIndicator = document.getElementById('pullToRefresh');
+        
+        if (!mainContent || !pullIndicator) return;
+
+        let startY = 0;
+        let currentY = 0;
+        let isPulling = false;
+
+        mainContent.addEventListener('touchstart', (e) => {
+            if (window.scrollY === 0) {
+                startY = e.touches[0].clientY;
+                isPulling = true;
+            }
+        }, { passive: true });
+
+        mainContent.addEventListener('touchmove', (e) => {
+            if (!isPulling) return;
+            
+            currentY = e.touches[0].clientY;
+            const diff = currentY - startY;
+
+            if (diff > 0 && diff < 100 && window.scrollY === 0) {
+                pullIndicator.style.display = 'flex';
+                pullIndicator.style.transform = `translateY(${Math.min(diff - 60, 0)}px)`;
+            }
+        }, { passive: true });
+
+        mainContent.addEventListener('touchend', () => {
+            if (currentY - startY > 60 && window.scrollY === 0) {
+                pullIndicator.classList.add('active');
+                this.triggerHapticFeedback();
+                
+                // Simulate refresh
+                setTimeout(() => {
+                    this.renderTasks();
+                    this.updateAllStats();
+                    pullIndicator.classList.remove('active');
+                    pullIndicator.style.display = 'none';
+                    pullIndicator.style.transform = '';
+                    this.showToast('Atualizado!', 'success');
+                }, 800);
+            } else {
+                pullIndicator.style.display = 'none';
+                pullIndicator.style.transform = '';
+            }
+            
+            isPulling = false;
+            startY = 0;
+            currentY = 0;
+        });
+    }
+
+    // ==================== SWIPE GESTURES ====================
+    setupSwipeGestures() {
+        // Swipe gestures will be handled per task card after rendering
+    }
+
+    addSwipeToCard(cardElement, taskId) {
+        if (!this.isMobile) return;
+
+        let startX = 0;
+        let currentX = 0;
+        let isSwiping = false;
+
+        cardElement.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            isSwiping = true;
+            this.swipingTaskId = taskId;
+        }, { passive: true });
+
+        cardElement.addEventListener('touchmove', (e) => {
+            if (!isSwiping) return;
+            
+            currentX = e.touches[0].clientX;
+            const diff = currentX - startX;
+
+            // Only allow horizontal swipe if not scrolling
+            if (Math.abs(diff) > 10) {
+                cardElement.style.transform = `translateX(${diff * 0.3}px)`;
+                cardElement.classList.add('swiping');
+            }
+        }, { passive: true });
+
+        cardElement.addEventListener('touchend', () => {
+            const diff = currentX - startX;
+
+            if (diff > 80) {
+                // Swipe right - complete task
+                this.toggleTaskComplete(taskId);
+                this.triggerHapticFeedback();
+            } else if (diff < -80) {
+                // Swipe left - delete task
+                this.deleteTaskPrompt(taskId);
+                this.triggerHapticFeedback();
+            }
+
+            cardElement.style.transform = '';
+            cardElement.classList.remove('swiping');
+            isSwiping = false;
+            startX = 0;
+            currentX = 0;
+            this.swipingTaskId = null;
+        });
+    }
+
+    // ==================== BOTTOM SHEET DRAG ====================
+    setupBottomSheetDrag() {
+        const modals = document.querySelectorAll('.modal.bottom-sheet, .modal.action-sheet');
+        
+        modals.forEach(modal => {
+            const handle = modal.querySelector('.bottom-sheet-handle');
+            if (!handle) return;
+
+            let startY = 0;
+            let currentY = 0;
+            let isDragging = false;
+
+            handle.addEventListener('touchstart', (e) => {
+                startY = e.touches[0].clientY;
+                isDragging = true;
+            }, { passive: true });
+
+            modal.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                
+                currentY = e.touches[0].clientY;
+                const diff = currentY - startY;
+
+                if (diff > 0) {
+                    modal.style.transform = `translateY(${diff}px)`;
+                }
+            }, { passive: true });
+
+            modal.addEventListener('touchend', () => {
+                const diff = currentY - startY;
+
+                if (diff > 100) {
+                    // Close modal
+                    const overlay = modal.closest('.modal-overlay');
+                    overlay?.classList.remove('active');
+                    this.closeTaskModal();
+                    this.closeDeleteModal();
+                }
+
+                modal.style.transform = '';
+                isDragging = false;
+                startY = 0;
+                currentY = 0;
+            });
+        });
+    }
+
+    // ==================== HAPTIC FEEDBACK ====================
+    triggerHapticFeedback() {
+        try {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(10);
+            }
+        } catch (error) {
+            // Vibrate API may fail on some devices - fail silently
+            console.debug('Haptic feedback not available:', error);
+        }
     }
 
     // ==================== EVENT LISTENERS ====================
@@ -236,6 +611,12 @@ class TaskSchedulerPro {
         document.getElementById('pageTitle').textContent = header.title;
         document.getElementById('pageSubtitle').textContent = header.subtitle;
 
+        // Update bottom navigation active state (mobile)
+        this.updateBottomNavActive(view);
+        
+        // Close mobile sidebar if open
+        this.closeMobileSidebar();
+
         this.renderTasks();
     }
 
@@ -248,6 +629,9 @@ class TaskSchedulerPro {
             item.classList.remove('active');
         });
         document.querySelector(`.nav-item[data-category="${category}"]`)?.classList.add('active');
+
+        // Close mobile sidebar if open
+        this.closeMobileSidebar();
 
         // Update page header
         const categories = {
@@ -311,6 +695,16 @@ class TaskSchedulerPro {
         });
 
         container.innerHTML = html;
+
+        // Add swipe gestures to cards on mobile
+        if (this.isMobile) {
+            document.querySelectorAll('.task-card').forEach(card => {
+                const taskId = card.dataset.taskId;
+                if (taskId) {
+                    this.addSwipeToCard(card, taskId);
+                }
+            });
+        }
     }
 
     getFilteredTasks() {
@@ -751,6 +1145,9 @@ class TaskSchedulerPro {
             circle.style.strokeDasharray = `${circumference} ${circumference}`;
             circle.style.strokeDashoffset = offset;
         }
+
+        // Update bottom nav badges (mobile)
+        this.updateBottomNavBadges();
     }
 
     // ==================== CALENDAR ====================
