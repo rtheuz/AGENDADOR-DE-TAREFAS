@@ -3,26 +3,26 @@
  * Advanced caching and offline support
  */
 
-const CACHE_VERSION = 'v3.0.0';
+const CACHE_VERSION = 'v3.0.1';
 const STATIC_CACHE = `taskscheduler-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `taskscheduler-dynamic-${CACHE_VERSION}`;
 const IMAGE_CACHE = `taskscheduler-images-${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/css/style.css',
-    '/js/app.js',
-    '/js/notifications.js',
-    '/manifest.json',
-    '/icons/icon-72x72.png',
-    '/icons/icon-96x96. png',
-    '/icons/icon-128x128.png',
-    '/icons/icon-144x144.png',
-    '/icons/icon-152x152.png',
-    '/icons/icon-192x192.png',
-    '/icons/icon-384x384.png',
-    '/icons/icon-512x512.png'
+    './',
+    './index.html',
+    './css/style.css',
+    './js/app.js',
+    './js/notifications.js',
+    './manifest.json',
+    './icons/icon-72x72.png',
+    './icons/icon-96x96. png',
+    './icons/icon-128x128.png',
+    './icons/icon-144x144.png',
+    './icons/icon-152x152.png',
+    './icons/icon-192x192.png',
+    './icons/icon-384x384.png',
+    './icons/icon-512x512.png'
 ];
 
 const CACHE_LIMITS = {
@@ -95,8 +95,8 @@ self.addEventListener('push', event => {
     let data = {
         title: 'Tarefas Bruna',
         body: 'Nova notificação',
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-96x96.png',
+        icon: './icons/icon-192x192.png',
+        badge: './icons/icon-96x96.png',
         tag: 'notification'
     };
     
@@ -129,12 +129,12 @@ self.addEventListener('notificationclick', event => {
         clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then(clientList => {
                 for (let client of clientList) {
-                    if (client.url === '/' && 'focus' in client) {
+                    if (client.url === './' && 'focus' in client) {
                         return client.focus();
                     }
                 }
                 if (clients.openWindow) {
-                    return clients.openWindow('/');
+                    return clients.openWindow('./');
                 }
             })
     );
