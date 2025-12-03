@@ -1,5 +1,19 @@
 # Configuração da Integração com Google Calendar
 
+## ⚠️ IMPORTANTE: Use um Servidor Local
+
+**NÃO abra o arquivo `index.html` diretamente pelo sistema de arquivos!**
+
+A API do Google Calendar requer HTTPS ou `http://localhost`. Abrir o arquivo diretamente (`file://`) causará erros de CORS e "Invalid cookiePolicy".
+
+**Sempre use um servidor local:**
+- Windows: Execute `start-server.bat`
+- Linux/Mac: Execute `./start-server.sh`
+- Ou use: `python -m http.server 8000`
+- Acesse: `http://localhost:8000`
+
+---
+
 Para usar a integração com Google Calendar, você precisa configurar as credenciais da API do Google.
 
 ## Passo 1: Criar um Projeto no Google Cloud Console

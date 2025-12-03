@@ -1485,13 +1485,28 @@ class TaskSchedulerPro {
 
     // ==================== GOOGLE CALENDAR INTEGRATION ====================
     async connectGoogleCalendar() {
-        if (window.GoogleCalendarIntegration) {
+        if (!window.GoogleCalendarIntegration) {
+            this.showToast('Integração com Google Calendar não disponível', 'error');
+            return;
+        }
+
+        // Check if API is ready
+        if (typeof gapi === 'undefined') {
+            this.showToast('Aguarde o carregamento da API do Google...', 'warning');
+            setTimeout(() => {
+                this.connectGoogleCalendar();
+            }, 2000);
+            return;
+        }
+
+        try {
             const success = await window.GoogleCalendarIntegration.authenticate();
             if (success) {
                 this.updateGoogleCalendarButton();
             }
-        } else {
-            this.showToast('Integração com Google Calendar não disponível', 'error');
+        } catch (error) {
+            console.error('Error connecting to Google Calendar:', error);
+            this.showToast('Erro ao conectar. Tente novamente.', 'error');
         }
     }
 

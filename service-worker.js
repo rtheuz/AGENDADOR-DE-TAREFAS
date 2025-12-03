@@ -14,9 +14,10 @@ const STATIC_ASSETS = [
     './css/style.css',
     './js/app.js',
     './js/notifications.js',
+    './js/google-calendar.js',
     './manifest.json',
     './icons/icon-72x72.png',
-    './icons/icon-96x96. png',
+    './icons/icon-96x96.png',
     './icons/icon-128x128.png',
     './icons/icon-144x144.png',
     './icons/icon-152x152.png',
@@ -38,10 +39,30 @@ self.addEventListener('install', event => {
         caches.open(STATIC_CACHE)
             .then(cache => {
                 console.log('[SW] Caching static assets');
-                return cache. addAll(STATIC_ASSETS);
+                // Cache files individually to avoid failing on missing files
+                return Promise.allSettled(
+                    STATIC_ASSETS.map(url => {
+                        return fetch(url)
+                            .then(response => {
+                                if (response.ok) {
+                                    return cache.put(url, response);
+                                }
+                            })
+                            .catch(error => {
+                                console.warn(`[SW] Failed to cache ${url}:`, error);
+                            });
+                    })
+                );
             })
-            .then(() => self.skipWaiting())
-            .catch(error => console.error('[SW] Install failed:', error))
+            .then(() => {
+                console.log('[SW] Static assets cached');
+                return self.skipWaiting();
+            })
+            .catch(error => {
+                console.error('[SW] Install failed:', error);
+                // Still skip waiting to allow SW to activate
+                return self.skipWaiting();
+            })
     );
 });
 

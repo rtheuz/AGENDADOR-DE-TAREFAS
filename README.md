@@ -148,6 +148,12 @@
 
 ## 🚀 Instalação
 
+### ⚠️ IMPORTANTE: Use um Servidor Local
+
+**NÃO abra o arquivo `index.html` diretamente pelo sistema de arquivos!**
+
+A API do Google Calendar requer HTTPS ou `http://localhost`. Abrir o arquivo diretamente (`file://`) causará erros de CORS.
+
 ### 1. Clone o Repositório
 
 ```bash
@@ -157,17 +163,29 @@ cd AGENDADOR-DE-TAREFAS
 
 ### 2. Servidor Local
 
-#### Opção 1: Python
+#### Opção 1: Script Automático (Recomendado)
+
+**Windows:**
+- Clique duas vezes em `start-server.bat`
+- Ou execute: `start-server.bat` no PowerShell
+
+**Linux/Mac:**
+```bash
+chmod +x start-server.sh
+./start-server.sh
+```
+
+#### Opção 2: Python
 ```bash
 python -m http.server 8000
 ```
 
-#### Opção 2: Node.js
+#### Opção 3: Node.js
 ```bash
 npx http-server -p 8000
 ```
 
-#### Opção 3: PHP
+#### Opção 4: PHP
 ```bash
 php -S localhost:8000
 ```
@@ -177,6 +195,8 @@ php -S localhost:8000
 ```
 http://localhost:8000
 ```
+
+**⚠️ NÃO use `file://` - sempre use `http://localhost:8000`**
 
 ## 📱 Instalar como PWA
 

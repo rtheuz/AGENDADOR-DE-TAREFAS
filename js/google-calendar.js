@@ -17,41 +17,104 @@ class GoogleCalendarIntegration {
     }
 
     init() {
-        // Check if Google API is loaded
-        if (typeof gapi === 'undefined') {
-            this.loadGoogleAPI();
-        } else {
+        // Wait for Google API to be loaded
+        this.waitForGoogleAPI().then(() => {
             this.initializeGAPI();
-        }
+        }).catch(error => {
+            console.error('Failed to load Google API:', error);
+        });
     }
 
-    loadGoogleAPI() {
-        // Check if script is already loaded
-        if (typeof gapi !== 'undefined') {
-            gapi.load('client:auth2', () => {
-                this.initializeGAPI();
-            });
-            return;
-        }
+    waitForGoogleAPI() {
+        return new Promise((resolve, reject) => {
+            // Check if already loaded and auth2 is ready
+            if (typeof gapi !== 'undefined' && typeof gapi.load !== 'undefined' && typeof gapi.auth2 !== 'undefined') {
+                resolve();
+                return;
+            }
 
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.onload = () => {
-            gapi.load('client:auth2', () => {
-                this.initializeGAPI();
-            });
-        };
-        script.onerror = () => {
-            console.warn('Failed to load Google API script');
-        };
-        document.head.appendChild(script);
+            // Check if already loaded but auth2 not ready
+            if (typeof gapi !== 'undefined' && typeof gapi.load !== 'undefined') {
+                gapi.load('client:auth2', {
+                    callback: () => {
+                        resolve();
+                    },
+                    onerror: () => {
+                        reject(new Error('Failed to load auth2 module'));
+                    },
+                    timeout: 10000,
+                    ontimeout: () => {
+                        reject(new Error('Timeout loading auth2 module'));
+                    }
+                });
+                return;
+            }
+
+            // Check if script tag exists
+            let script = document.querySelector('script[src*="apis.google.com/js/api.js"]');
+            
+            if (!script) {
+                // Create and load script
+                script = document.createElement('script');
+                script.src = 'https://apis.google.com/js/api.js';
+                script.onload = () => {
+                    gapi.load('client:auth2', {
+                        callback: () => {
+                            resolve();
+                        },
+                        onerror: () => {
+                            reject(new Error('Failed to load auth2 module'));
+                        },
+                        timeout: 10000,
+                        ontimeout: () => {
+                            reject(new Error('Timeout loading auth2 module'));
+                        }
+                    });
+                };
+                script.onerror = () => {
+                    reject(new Error('Failed to load Google API script'));
+                };
+                document.head.appendChild(script);
+            } else {
+                // Script exists, wait for it to load
+                const checkInterval = setInterval(() => {
+                    if (typeof gapi !== 'undefined' && typeof gapi.load !== 'undefined') {
+                        clearInterval(checkInterval);
+                        gapi.load('client:auth2', {
+                            callback: () => {
+                                resolve();
+                            },
+                            onerror: () => {
+                                reject(new Error('Failed to load auth2 module'));
+                            },
+                            timeout: 10000,
+                            ontimeout: () => {
+                                reject(new Error('Timeout loading auth2 module'));
+                            }
+                        });
+                    }
+                }, 100);
+
+                // Timeout after 15 seconds
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    if (typeof gapi === 'undefined') {
+                        reject(new Error('Google API failed to load within timeout'));
+                    }
+                }, 15000);
+            }
+        });
     }
 
     async initializeGAPI() {
         try {
-            // Check if gapi is loaded
+            // Final check if gapi is loaded
             if (typeof gapi === 'undefined' || typeof gapi.client === 'undefined') {
-                console.warn('Google API not loaded yet');
+                console.warn('Google API not loaded yet, retrying...');
+                // Retry after a short delay
+                setTimeout(() => {
+                    this.initializeGAPI();
+                }, 500);
                 return;
             }
 
@@ -59,43 +122,94 @@ class GoogleCalendarIntegration {
             const savedApiKey = localStorage.getItem('google_calendar_api_key');
             const savedClientId = localStorage.getItem('google_calendar_client_id');
             
-            const apiKey = this.apiKey || savedApiKey || 'AIzaSyDeePME2wJ1A5D3jRCXVVmxprwDlmY1CoQ';
-            const clientId = this.clientId || savedClientId || '788764070114-dbd1iasevvmk66s3366qvc518p286f59.apps.googleusercontent.com';
+            const apiKey = this.apiKey || savedApiKey || 'AIzaSyDOC4F5cEwCufQOa1GDWzDznL0FRmMQz30';
+            const clientId = this.clientId || savedClientId || '700664728932-907a6b6tk5lci7ak391l085dcc5os43m.apps.googleusercontent.com';
             
-            // Show warning if using default values, but don't block initialization
-            if (apiKey === 'AIzaSyDeePME2wJ1A5D3jRCXVVmxprwDlmY1CoQ' || clientId === '788764070114-dbd1iasevvmk66s3366qvc518p286f59.apps.googleusercontent.com') {
-                console.warn('⚠️ Configure suas credenciais do Google Calendar em js/google-calendar.js');
+            // Validate credentials (check if they look like real credentials)
+            if (!apiKey || apiKey.length < 20 || !clientId || clientId.length < 20) {
+                console.warn('⚠️ Credenciais do Google Calendar inválidas');
                 console.warn('📖 Veja GOOGLE_CALENDAR_SETUP.md para instruções');
-                // Don't return, just skip initialization
                 return;
             }
+            
+            console.log('Inicializando Google Calendar API...');
             
             await gapi.client.init({
                 apiKey: apiKey,
                 clientId: clientId,
                 discoveryDocs: this.discoveryDocs,
-                scope: this.scope
+                scope: this.scope,
+                cookiePolicy: 'single_host_origin'
             });
 
-            // Check if user is already signed in
-            const authInstance = gapi.auth2.getAuthInstance();
-            this.isAuthenticated = authInstance.isSignedIn.get();
-            
-            if (this.isAuthenticated) {
-                this.accessToken = authInstance.currentUser.get().getAuthResponse().access_token;
-            }
+            // Wait a bit for auth2 to be fully ready
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-            console.log('✓ Google Calendar API initialized');
+            // Check if user is already signed in
+            try {
+                const authInstance = gapi.auth2.getAuthInstance();
+                if (authInstance) {
+                    this.isAuthenticated = authInstance.isSignedIn.get();
+                    
+                    if (this.isAuthenticated) {
+                        const user = authInstance.currentUser.get();
+                        const authResponse = user.getAuthResponse();
+                        this.accessToken = authResponse.access_token;
+                        console.log('✓ Google Calendar API initialized - Usuário já autenticado');
+                    } else {
+                        console.log('✓ Google Calendar API initialized - Pronto para autenticação');
+                    }
+                } else {
+                    console.log('✓ Google Calendar API initialized');
+                }
+            } catch (authError) {
+                console.warn('Auth2 not ready yet:', authError);
+                console.log('✓ Google Calendar API initialized (auth2 will be available after first sign-in)');
+            }
         } catch (error) {
-            console.error('Error initializing Google API:', error);
+            console.error('Erro ao inicializar Google API:', error);
+            if (error.message) {
+                console.error('Detalhes:', error.message);
+            }
+            if (error.error) {
+                console.error('Erro da API:', error.error);
+            }
             // Don't throw - allow app to continue without Google Calendar
+            console.warn('⚠️ Google Calendar não estará disponível até que o erro seja resolvido');
         }
     }
 
     async authenticate() {
         try {
+            // Check if already authenticated
+            if (this.isAuthenticated && this.accessToken) {
+                if (window.app) {
+                    window.app.showToast('Já conectado ao Google Calendar! 📅', 'info');
+                }
+                return true;
+            }
+
+            // Check if gapi is ready
+            if (typeof gapi === 'undefined' || typeof gapi.auth2 === 'undefined') {
+                console.error('Google API not ready for authentication');
+                if (window.app) {
+                    window.app.showToast('Aguarde o carregamento da API do Google', 'warning');
+                }
+                return false;
+            }
+
             const authInstance = gapi.auth2.getAuthInstance();
-            const user = await authInstance.signIn();
+            if (!authInstance) {
+                console.error('Auth instance not available');
+                if (window.app) {
+                    window.app.showToast('Erro: API não inicializada. Recarregue a página.', 'error');
+                }
+                return false;
+            }
+
+            const user = await authInstance.signIn({
+                prompt: 'select_account'
+            });
             
             this.isAuthenticated = true;
             this.accessToken = user.getAuthResponse().access_token;
@@ -110,8 +224,18 @@ class GoogleCalendarIntegration {
             return true;
         } catch (error) {
             console.error('Error authenticating:', error);
+            
+            let errorMessage = 'Erro ao conectar com Google Calendar';
+            if (error.error) {
+                if (error.error === 'popup_closed_by_user') {
+                    errorMessage = 'Autenticação cancelada';
+                } else if (error.error === 'access_denied') {
+                    errorMessage = 'Acesso negado. Tente novamente.';
+                }
+            }
+            
             if (window.app) {
-                window.app.showToast('Erro ao conectar com Google Calendar', 'error');
+                window.app.showToast(errorMessage, 'error');
             }
             return false;
         }
@@ -353,10 +477,10 @@ class GoogleCalendarIntegration {
         localStorage.setItem('google_calendar_credentials', JSON.stringify(credentials));
         
         // Also save API key and Client ID if provided
-        if (this.apiKey && this.apiKey !== 'AIzaSyDeePME2wJ1A5D3jRCXVVmxprwDlmY1CoQ') {
+        if (this.apiKey && this.apiKey !== 'AIzaSyDOC4F5cEwCufQOa1GDWzDznL0FRmMQz30') {
             localStorage.setItem('google_calendar_api_key', this.apiKey);
         }
-        if (this.clientId && this.clientId !== '788764070114-dbd1iasevvmk66s3366qvc518p286f59.apps.googleusercontent.com') {
+        if (this.clientId && this.clientId !== '700664728932-907a6b6tk5lci7ak391l085dcc5os43m.apps.googleusercontent.com') {
             localStorage.setItem('google_calendar_client_id', this.clientId);
         }
     }
@@ -385,12 +509,19 @@ class GoogleCalendarIntegration {
 // Initialize and expose globally
 window.GoogleCalendarIntegration = new GoogleCalendarIntegration();
 
-// Auto-initialize when DOM is ready
+// Auto-initialize when DOM is ready and Google API is loaded
+function initializeGoogleCalendar() {
+    // Wait a bit to ensure Google API script has time to load
+    setTimeout(() => {
+        if (window.GoogleCalendarIntegration) {
+            window.GoogleCalendarIntegration.init();
+        }
+    }, 1000);
+}
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        window.GoogleCalendarIntegration.init();
-    });
+    document.addEventListener('DOMContentLoaded', initializeGoogleCalendar);
 } else {
-    window.GoogleCalendarIntegration.init();
+    initializeGoogleCalendar();
 }
 
