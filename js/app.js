@@ -40,8 +40,30 @@ class TaskSchedulerPro {
             window.NotificationManager.init();
         }
 
+        // Listen for messages from service worker
+        this.setupServiceWorkerMessageListener();
+
+        // Update Google Calendar button status
+        setTimeout(() => {
+            this.updateGoogleCalendarButton();
+        }, 1000);
+
         console.log('✓ TaskScheduler Pro initialized');
         console.log('✓ Mobile mode:', this.isMobile);
+    }
+
+    // ==================== SERVICE WORKER MESSAGE LISTENER ====================
+    setupServiceWorkerMessageListener() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'OPEN_TASK') {
+                    const taskId = event.data.taskId;
+                    if (taskId) {
+                        this.openTaskModal(taskId);
+                    }
+                }
+            });
+        }
     }
 
     // ==================== MOBILE DEVICE DETECTION ====================
@@ -481,10 +503,16 @@ class TaskSchedulerPro {
                     btn.classList.toggle('active');
                     icon.textContent = options.classList.contains('hidden') ? '▼' : '▲';
 
-                    console.log('Advanced options toggled:', !options.classList.contains('hidden'));
+                    // Show Google Calendar sync option if connected
+                    this.updateGoogleCalendarSyncOption();
                 }
             });
         }
+
+        // Google Calendar sync checkbox
+        document.getElementById('syncToGoogleCalendar')?.addEventListener('change', (e) => {
+            // This will be handled when saving the task
+        });
 
         // Delete Modal
         document.getElementById('closeDeleteModal')?.addEventListener('click', () => this.closeDeleteModal());
@@ -504,6 +532,8 @@ class TaskSchedulerPro {
         document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importFile').click());
         document.getElementById('importFile')?.addEventListener('change', (e) => this.importTasks(e.target.files[0]));
         document.getElementById('enableNotifications')?.addEventListener('click', () => this.enableNotifications());
+        document.getElementById('syncGoogleCalendar')?.addEventListener('click', () => this.syncToGoogleCalendar());
+        document.getElementById('connectGoogleCalendar')?.addEventListener('click', () => this.connectGoogleCalendar());
         document.getElementById('clearCompleted')?.addEventListener('click', () => this.clearCompletedTasks());
 
         // Keyboard Shortcuts
@@ -985,10 +1015,20 @@ class TaskSchedulerPro {
         if (taskId) {
             const index = this.tasks.findIndex(t => t.id === taskId);
             if (index !== -1) {
-                task.completed = this.tasks[index].completed;
-                task.createdAt = this.tasks[index].createdAt;
+                const oldTask = this.tasks[index];
+                task.completed = oldTask.completed;
+                task.createdAt = oldTask.createdAt;
+                task.googleEventId = oldTask.googleEventId; // Preserve Google Calendar event ID
                 this.tasks[index] = task;
                 this.showToast('Tarefa atualizada com sucesso!  ✓', 'success');
+
+                // Update Google Calendar if connected
+                if (window.GoogleCalendarIntegration && task.googleEventId) {
+                    const status = window.GoogleCalendarIntegration.getAuthStatus();
+                    if (status.isAuthenticated) {
+                        window.GoogleCalendarIntegration.updateEvent(task, task.googleEventId);
+                    }
+                }
             }
         } else {
             this.tasks.push(task);
@@ -998,6 +1038,19 @@ class TaskSchedulerPro {
             if (window.NotificationManager && reminder !== 'none') {
                 window.NotificationManager.scheduleNotification(task);
             }
+
+            // Create Google Calendar event if connected and checkbox is checked
+            const syncCheckbox = document.getElementById('syncToGoogleCalendar');
+            if (window.GoogleCalendarIntegration && syncCheckbox?.checked) {
+                const status = window.GoogleCalendarIntegration.getAuthStatus();
+                if (status.isAuthenticated) {
+                    const event = await window.GoogleCalendarIntegration.createEvent(task);
+                    if (event) {
+                        task.googleEventId = event.id;
+                        this.saveTasks();
+                    }
+                }
+            }
         }
 
         this.saveTasks();
@@ -1006,6 +1059,9 @@ class TaskSchedulerPro {
         this.renderCalendar();
         this.renderUpcomingEvents();
         this.closeTaskModal();
+        
+        // Update Google Calendar button status
+        this.updateGoogleCalendarButton();
     }
 
     toggleTaskComplete(taskId) {
@@ -1068,9 +1124,18 @@ class TaskSchedulerPro {
         this.editingTaskId = null;
     }
 
-    confirmDelete() {
+    async confirmDelete() {
         if (this.editingTaskId) {
             const task = this.tasks.find(t => t.id === this.editingTaskId);
+            
+            // Delete from Google Calendar if connected
+            if (task?.googleEventId && window.GoogleCalendarIntegration) {
+                const status = window.GoogleCalendarIntegration.getAuthStatus();
+                if (status.isAuthenticated) {
+                    await window.GoogleCalendarIntegration.deleteEvent(task.googleEventId);
+                }
+            }
+
             this.tasks = this.tasks.filter(t => t.id !== this.editingTaskId);
 
             this.saveTasks();
@@ -1415,6 +1480,70 @@ class TaskSchedulerPro {
             this.renderTasks();
             this.updateAllStats();
             this.showToast(`${completedCount} tarefa(s) removida(s) 🗑️`, 'success');
+        }
+    }
+
+    // ==================== GOOGLE CALENDAR INTEGRATION ====================
+    async connectGoogleCalendar() {
+        if (window.GoogleCalendarIntegration) {
+            const success = await window.GoogleCalendarIntegration.authenticate();
+            if (success) {
+                this.updateGoogleCalendarButton();
+            }
+        } else {
+            this.showToast('Integração com Google Calendar não disponível', 'error');
+        }
+    }
+
+    async syncToGoogleCalendar() {
+        if (!window.GoogleCalendarIntegration) {
+            this.showToast('Integração com Google Calendar não disponível', 'error');
+            return;
+        }
+
+        const status = window.GoogleCalendarIntegration.getAuthStatus();
+        if (!status.isAuthenticated) {
+            this.showToast('Conecte-se ao Google Calendar primeiro', 'warning');
+            const connected = await window.GoogleCalendarIntegration.authenticate();
+            if (!connected) return;
+        }
+
+        this.showToast('Sincronizando com Google Calendar...', 'info');
+        await window.GoogleCalendarIntegration.syncTasksToCalendar(this.tasks);
+        this.saveTasks();
+    }
+
+    updateGoogleCalendarButton() {
+        const btn = document.getElementById('connectGoogleCalendar');
+        if (btn && window.GoogleCalendarIntegration) {
+            const status = window.GoogleCalendarIntegration.getAuthStatus();
+            if (status.isAuthenticated) {
+                btn.innerHTML = '<span>✅</span><span>Desconectar Google Calendar</span>';
+                btn.onclick = () => this.disconnectGoogleCalendar();
+            } else {
+                btn.innerHTML = '<span>🔗</span><span>Conectar Google Calendar</span>';
+                btn.onclick = () => this.connectGoogleCalendar();
+            }
+        }
+        this.updateGoogleCalendarSyncOption();
+    }
+
+    updateGoogleCalendarSyncOption() {
+        const syncGroup = document.getElementById('googleCalendarSyncGroup');
+        if (syncGroup && window.GoogleCalendarIntegration) {
+            const status = window.GoogleCalendarIntegration.getAuthStatus();
+            if (status.isAuthenticated) {
+                syncGroup.style.display = 'block';
+            } else {
+                syncGroup.style.display = 'none';
+            }
+        }
+    }
+
+    async disconnectGoogleCalendar() {
+        if (window.GoogleCalendarIntegration) {
+            await window.GoogleCalendarIntegration.signOut();
+            this.updateGoogleCalendarButton();
         }
     }
 

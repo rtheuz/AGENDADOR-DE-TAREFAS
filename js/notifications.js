@@ -115,11 +115,15 @@ class NotificationManager {
         const now = new Date();
         const reminderMinutes = parseInt(task.reminder) || 30;
         
-        const notificationTime = new Date(taskDateTime. getTime() - reminderMinutes * 60 * 1000);
+        const notificationTime = new Date(taskDateTime.getTime() - reminderMinutes * 60 * 1000);
 
         if (notificationTime > now) {
-            const timeUntil = notificationTime. getTime() - now.getTime();
+            const timeUntil = notificationTime.getTime() - now.getTime();
 
+            // Cancel existing notification for this task
+            this.cancelNotification(task.id);
+
+            // Schedule notification in main thread (for when app is open)
             const timeoutId = setTimeout(() => {
                 this.showNotification(
                     '⏰ Lembrete de Tarefa',
@@ -132,14 +136,78 @@ class NotificationManager {
                 );
             }, timeUntil);
 
-            this.scheduledNotifications.set(task. id, {
+            this.scheduledNotifications.set(task.id, {
                 timeoutId,
-                notificationTime: notificationTime. toISOString(),
+                notificationTime: notificationTime.toISOString(),
                 taskTitle: task.title
             });
 
+            // Schedule notification in Service Worker (works even when app is closed)
+            this.scheduleNotificationInServiceWorker(task, notificationTime, reminderMinutes);
+
             console.log(`✓ Notification scheduled for ${task.title} at ${notificationTime.toLocaleString()}`);
         }
+    }
+
+    async scheduleNotificationInServiceWorker(task, notificationTime, reminderMinutes) {
+        if (!('serviceWorker' in navigator)) return;
+
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            
+            // Send message to service worker to schedule notification
+            registration.active?.postMessage({
+                type: 'SCHEDULE_NOTIFICATION',
+                data: {
+                    taskId: task.id,
+                    title: task.title,
+                    notificationTime: notificationTime.toISOString(),
+                    reminderMinutes: reminderMinutes,
+                    taskDateTime: this.getTaskDateTime(task).toISOString()
+                }
+            });
+
+            // Also save to IndexedDB for persistence
+            await this.saveNotificationToIndexedDB({
+                taskId: task.id,
+                title: task.title,
+                notificationTime: notificationTime.toISOString(),
+                reminderMinutes: reminderMinutes,
+                taskDateTime: this.getTaskDateTime(task).toISOString()
+            });
+        } catch (error) {
+            console.error('Error scheduling notification in service worker:', error);
+        }
+    }
+
+    async saveNotificationToIndexedDB(notificationData) {
+        if (!('indexedDB' in window)) return;
+
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('TaskSchedulerDB', 1);
+
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                const db = request.result;
+                const transaction = db.transaction(['notifications'], 'readwrite');
+                const store = transaction.objectStore('notifications');
+                
+                // Delete old notification for this task if exists
+                store.delete(notificationData.taskId);
+                
+                // Add new notification
+                store.add(notificationData);
+                resolve();
+            };
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('notifications')) {
+                    const store = db.createObjectStore('notifications', { keyPath: 'taskId' });
+                    store.createIndex('notificationTime', 'notificationTime', { unique: false });
+                }
+            };
+        });
     }
 
     cancelNotification(taskId) {

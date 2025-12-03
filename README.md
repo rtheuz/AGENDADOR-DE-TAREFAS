@@ -45,7 +45,7 @@
   - 📋 Todas as Tarefas
   - ✅ Concluídas
 
-### 🔔 Sistema de Notificações
+### 🔔 Sistema de Notificações Avançado
 
 - **Lembretes Configuráveis**
   - No horário da tarefa
@@ -53,10 +53,17 @@
   - 1 hora antes
   - 1 dia antes
 
+- **Notificações em Background** ⭐ NOVO
+  - Funciona mesmo com o app fechado
+  - Funciona com o celular bloqueado
+  - Usa Service Worker e IndexedDB
+  - Notificações agendadas persistentes
+
 - **Notificações Inteligentes**
   - Alertas de tarefas atrasadas
   - Resumo diário
   - Notificações push
+  - Ações rápidas nas notificações
 
 ### 📅 Calendário Integrado
 
@@ -65,13 +72,30 @@
 - Navegação rápida entre meses
 - Filtro por data
 
-### 🎨 Design & UX
+### 🔗 Integração com Google Calendar ⭐ NOVO
+
+- **Sincronização Bidirecional**
+  - Cria eventos automaticamente no Google Calendar
+  - Atualiza eventos quando você edita tarefas
+  - Remove eventos quando você exclui tarefas
+  - Sincronização manual de todas as tarefas
+
+- **Recursos Avançados**
+  - Lembretes configurados automaticamente
+  - Cores baseadas na prioridade da tarefa
+  - Conexão/desconexão fácil
+  - Veja [GOOGLE_CALENDAR_SETUP.md](GOOGLE_CALENDAR_SETUP.md) para configuração
+
+### 🎨 Design & UX Modernizado ⭐ MELHORADO
 
 - **Interface Profissional**
   - Design system completo
   - Componentes reutilizáveis
-  - Animações suaves
+  - Animações suaves e modernas
   - Feedback visual em todas as ações
+  - Efeitos de hover aprimorados
+  - Gradientes e sombras modernas
+  - Transições com bounce effect
 
 - **Tema Escuro/Claro**
   - Alternância com um clique
@@ -251,7 +275,8 @@ AGENDADOR-DE-TAREFAS/
 │
 ├── js/
 │   ├── app.js             # Lógica principal
-│   └── notifications.js   # Sistema de notificações
+│   ├── notifications.js   # Sistema de notificações
+│   └── google-calendar.js # Integração Google Calendar ⭐ NOVO
 │
 ├── icons/
 │   ├── icon-72x72.png
@@ -307,6 +332,19 @@ const categoryIcons = {
 - Verifique permissões do navegador
 - Confirme HTTPS ou localhost
 - Teste em modo normal (não anônimo)
+- Certifique-se de que o Service Worker está registrado
+- No Chrome: Configurações > Privacidade > Notificações
+
+### Notificações não funcionam com app fechado
+- Verifique se o Service Worker está ativo
+- Confirme que IndexedDB está habilitado
+- As notificações são verificadas a cada minuto pelo Service Worker
+
+### Google Calendar não conecta
+- Veja [GOOGLE_CALENDAR_SETUP.md](GOOGLE_CALENDAR_SETUP.md) para instruções detalhadas
+- Verifique se as credenciais estão corretas
+- Confirme que a Google Calendar API está ativada
+- Verifique as URLs autorizadas no Google Cloud Console
 
 ### App não instala
 - Use navegador compatível
@@ -327,9 +365,9 @@ const categoryIcons = {
 - [ ] Modo Pomodoro
 
 ### Versão 3.2
+- [x] Integração com Google Calendar ✅
 - [ ] Sincronização em nuvem (opcional)
 - [ ] Compartilhamento de tarefas
-- [ ] Integração com Google Calendar
 - [ ] Widgets para Android
 
 ### Versão 4.0

@@ -88,6 +88,148 @@ self.addEventListener('fetch', event => {
     }
 });
 
+// Scheduled Notifications Storage
+let scheduledNotifications = new Map();
+
+// Check and trigger scheduled notifications
+async function checkScheduledNotifications() {
+    const now = new Date();
+    
+    // Load from IndexedDB
+    try {
+        const db = await openIndexedDB();
+        if (!db) return;
+        
+        const notifications = await getAllNotifications(db);
+        
+        for (const notif of notifications) {
+            const notificationTime = new Date(notif.notificationTime);
+            
+            if (notificationTime <= now && !notif.triggered) {
+                // Time to show notification
+                await self.registration.showNotification('⏰ Lembrete de Tarefa', {
+                    body: `${notif.title} em ${notif.reminderMinutes} minutos!`,
+                    icon: './icons/icon-192x192.png',
+                    badge: './icons/icon-96x96.png',
+                    tag: `reminder-${notif.taskId}`,
+                    vibrate: [200, 100, 200],
+                    requireInteraction: true,
+                    data: { taskId: notif.taskId },
+                    actions: [
+                        { action: 'view', title: 'Ver Tarefa' },
+                        { action: 'dismiss', title: 'Dispensar' }
+                    ]
+                });
+                
+                // Mark as triggered
+                await markNotificationAsTriggered(db, notif.taskId);
+            }
+        }
+    } catch (error) {
+        console.error('[SW] Error checking scheduled notifications:', error);
+    }
+}
+
+// IndexedDB helpers
+function openIndexedDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('TaskSchedulerDB', 1);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('notifications')) {
+                const store = db.createObjectStore('notifications', { keyPath: 'taskId' });
+                store.createIndex('notificationTime', 'notificationTime', { unique: false });
+            }
+        };
+    });
+}
+
+function getAllNotifications(db) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['notifications'], 'readonly');
+        const store = transaction.objectStore('notifications');
+        const request = store.getAll();
+        
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+function markNotificationAsTriggered(db, taskId) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['notifications'], 'readwrite');
+        const store = transaction.objectStore('notifications');
+        const request = store.delete(taskId);
+        
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Check notifications every minute
+setInterval(checkScheduledNotifications, 60000);
+// Initial check after 5 seconds
+setTimeout(checkScheduledNotifications, 5000);
+
+// Message handler for scheduling notifications
+self.addEventListener('message', event => {
+    console.log('[SW] Message received:', event.data);
+    
+    if (event.data && event.data.type === 'SCHEDULE_NOTIFICATION') {
+        const { data } = event.data;
+        
+        // Store notification
+        event.waitUntil(
+            openIndexedDB().then(db => {
+                if (!db) return;
+                
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(['notifications'], 'readwrite');
+                    const store = transaction.objectStore('notifications');
+                    
+                    // Delete old notification for this task
+                    const deleteRequest = store.delete(data.taskId);
+                    
+                    deleteRequest.onsuccess = () => {
+                        // Add new notification
+                        const addRequest = store.add({
+                            taskId: data.taskId,
+                            title: data.title,
+                            notificationTime: data.notificationTime,
+                            reminderMinutes: data.reminderMinutes,
+                            taskDateTime: data.taskDateTime,
+                            triggered: false
+                        });
+                        
+                        addRequest.onsuccess = () => {
+                            console.log('[SW] Notification scheduled:', data.title);
+                            resolve();
+                        };
+                        
+                        addRequest.onerror = () => reject(addRequest.error);
+                    };
+                    
+                    deleteRequest.onerror = () => reject(deleteRequest.error);
+                });
+            }).catch(error => {
+                console.error('[SW] Error scheduling notification:', error);
+            })
+        );
+    }
+    
+    if (event.data.action === 'skipWaiting') {
+        self.skipWaiting();
+    }
+    
+    if (event.data.action === 'clearCache') {
+        event.waitUntil(clearAllCaches());
+    }
+});
+
 // Push Notifications
 self.addEventListener('push', event => {
     console.log('[SW] Push notification received');
@@ -102,7 +244,7 @@ self.addEventListener('push', event => {
     
     if (event.data) {
         try {
-            data = { ...data, ...event.data. json() };
+            data = { ...data, ...event.data.json() };
         } catch (e) {
             console.error('[SW] Error parsing push data:', e);
         }
@@ -122,19 +264,43 @@ self.addEventListener('push', event => {
 
 // Notification Click
 self.addEventListener('notificationclick', event => {
-    console. log('[SW] Notification clicked');
+    console.log('[SW] Notification clicked');
     event.notification.close();
+    
+    const action = event.action;
+    const taskId = event.notification.data?.taskId;
+    
+    if (action === 'dismiss') {
+        return;
+    }
     
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then(clientList => {
+                const url = './';
+                
+                // Try to focus existing window
                 for (let client of clientList) {
-                    if (client.url === './' && 'focus' in client) {
-                        return client.focus();
+                    if (client.url.includes(url) && 'focus' in client) {
+                        client.focus();
+                        // Send message to open task if taskId exists
+                        if (taskId) {
+                            client.postMessage({ type: 'OPEN_TASK', taskId: taskId });
+                        }
+                        return;
                     }
                 }
+                
+                // Open new window if none exists
                 if (clients.openWindow) {
-                    return clients.openWindow('./');
+                    return clients.openWindow(url).then(client => {
+                        if (client && taskId) {
+                            // Wait a bit for page to load, then send message
+                            setTimeout(() => {
+                                client.postMessage({ type: 'OPEN_TASK', taskId: taskId });
+                            }, 1000);
+                        }
+                    });
                 }
             })
     );
@@ -149,18 +315,6 @@ self.addEventListener('sync', event => {
     }
 });
 
-// Message
-self.addEventListener('message', event => {
-    console.log('[SW] Message received:', event.data);
-    
-    if (event. data.action === 'skipWaiting') {
-        self.skipWaiting();
-    }
-    
-    if (event.data. action === 'clearCache') {
-        event.waitUntil(clearAllCaches());
-    }
-});
 
 // Helper Functions
 function isStaticAsset(url) {
